@@ -1,0 +1,6 @@
+D:\ConnectPLC\ConnectPLC\bin\Debug\ConnectPLC.dll
+D:\ConnectPLC\ConnectPLC\bin\Debug\ConnectPLC.pdb
+D:\ConnectPLC\ConnectPLC\obj\Debug\ConnectPLC.csproj.AssemblyReference.cache
+D:\ConnectPLC\ConnectPLC\obj\Debug\ConnectPLC.csproj.CoreCompileInputs.cache
+D:\ConnectPLC\ConnectPLC\obj\Debug\ConnectPLC.dll
+D:\ConnectPLC\ConnectPLC\obj\Debug\ConnectPLC.pdb
