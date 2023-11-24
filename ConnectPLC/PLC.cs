@@ -13,18 +13,13 @@ namespace TALibrary
 {
     public class PLC
     {
-        private IPAddress ipaddress;
-        private int port;
-
-
-        public IPAddress Ipaddress { get => ipaddress; set => ipaddress = value; }
-        public int Port { get => port; set => port = value; }
         byte[] TemplateRead = { 0x50, 0x00, 0x00, 0xff, 0xff, 0x03, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x01, 0x04, 0x01, 0x00 };
         byte[] TemplateWrite = { 0x50, 0x00, 0x00, 0xff, 0xff, 0x03, 0x00, 0x0D, 0x00, 0x00, 0x00, 0x01, 0x14, 0x01, 0x00 };
-        public PLC(IPAddress ipaddress_server, int port_server)
+        byte[] TempleteWritePath1 = { 0x50, 0x00, 0x00, 0xff, 0xff, 0x03, 0x00 };
+        byte[] TempleteWritePath3 = { 0x00, 0x00, 0x01, 0x14, 0x00, 0x00 };
+        public PLC()
         {
-            Ipaddress = ipaddress_server;
-            Port = port_server;
+          
         }
         public async Task<bool> ReadBit(NetworkStream stream, int TimeOut, string typedevice, int device)
         {
@@ -139,8 +134,125 @@ namespace TALibrary
                 CancellationToken.Cancel();
                 throw new TimeoutException($"{typedevice}{device} Error Trigger Exist Send timed out.");
             }
-            int bytesRead = await readTask;
+            await readTask;
 
+        }
+        public async Task WriteASCII(NetworkStream stream, int TimeOut, string Devicestr, int HeaderDeviceint, int NumberofDeviceint, string datawrite)
+        {
+            byte[] DataReciveFromPLC = new byte[100];
+            StringBuilder strb = new StringBuilder();
+            byte[] HeaderDevice = BitConverter.GetBytes(HeaderDeviceint);
+            byte[] Device = Converttextdevicetohexdevice(Devicestr);
+            byte[] NumberofDevice = BitConverter.GetBytes(NumberofDeviceint);
+            byte[] datawritetoplc;
+
+            if (datawrite.Length / 2 != NumberofDeviceint)
+            {
+                strb.Clear();
+                strb.Append(datawrite);
+                int lenghtdatawrite = datawrite.Length;
+                for (int i = 0; i < NumberofDeviceint * 2 - lenghtdatawrite; i++)
+                {
+                    strb.Append("\u0000");
+                }
+                datawrite = strb.ToString();
+                datawritetoplc = Encoding.ASCII.GetBytes(datawrite);
+            }
+            else
+            {
+                datawritetoplc = Encoding.ASCII.GetBytes(datawrite);
+            }
+            byte[] path2 = BitConverter.GetBytes(TempleteWritePath3.Length + 6 + datawritetoplc.Length);
+            byte[] CmdSendPLC = new byte[21 + datawritetoplc.Length];
+            Buffer.BlockCopy(TempleteWritePath1, 0, CmdSendPLC, 0, TempleteWritePath1.Length);
+            Buffer.BlockCopy(path2, 0, CmdSendPLC, 7, 2);
+            Buffer.BlockCopy(TempleteWritePath3, 0, CmdSendPLC, 9, TempleteWritePath3.Length);
+            Buffer.BlockCopy(HeaderDevice, 0, CmdSendPLC, 9 + TempleteWritePath3.Length, 3);
+            Buffer.BlockCopy(Device, 0, CmdSendPLC, 12 + TempleteWritePath3.Length, 1);
+            Buffer.BlockCopy(NumberofDevice, 0, CmdSendPLC, 13 + TempleteWritePath3.Length, 2);
+            Buffer.BlockCopy(datawritetoplc, 0, CmdSendPLC, 15 + TempleteWritePath3.Length, datawritetoplc.Length);
+
+            CancellationTokenSource CancellationToken = new CancellationTokenSource();
+            Task writeTask = stream.WriteAsync(CmdSendPLC, 0, CmdSendPLC.Length, CancellationToken.Token);
+            if (await Task.WhenAny(writeTask, Task.Delay(TimeOut, CancellationToken.Token)) != writeTask)
+            {
+                CancellationToken.Cancel();
+                throw new TimeoutException($"{Devicestr}{HeaderDeviceint} Error Trigger Exist Send timed out.");
+            }
+            await writeTask;
+            Task<int> readTask = stream.ReadAsync(DataReciveFromPLC, 0, DataReciveFromPLC.Length, CancellationToken.Token);
+            if (await Task.WhenAny(readTask, Task.Delay(TimeOut, CancellationToken.Token)) != readTask)
+            {
+                CancellationToken.Cancel();
+                throw new TimeoutException($"{Devicestr}{HeaderDeviceint} Error Trigger Exist Send timed out.");
+            }
+            await readTask;
+        }
+        public async Task WriteDEC(NetworkStream stream, int TimeOut, string Devicestr, int HeaderDeviceint, int datawrite)
+        {
+            byte[] DataReciveFromPLC = new byte[100];
+            byte[] HeaderDevice = BitConverter.GetBytes(HeaderDeviceint);
+            byte[] Device = Converttextdevicetohexdevice(Devicestr);
+            byte[] NumberofDevice = BitConverter.GetBytes(2);
+            byte[] datawritetoplc;
+            datawritetoplc = BitConverter.GetBytes(datawrite);
+            byte[] path2 = BitConverter.GetBytes(TempleteWritePath3.Length + 6 + datawritetoplc.Length);
+            byte[] CmdSendPLC = new byte[21 + datawritetoplc.Length];
+            Buffer.BlockCopy(TempleteWritePath1, 0, CmdSendPLC, 0, TempleteWritePath1.Length);
+            Buffer.BlockCopy(path2, 0, CmdSendPLC, 7, 2);
+            Buffer.BlockCopy(TempleteWritePath3, 0, CmdSendPLC, 9, TempleteWritePath3.Length);
+            Buffer.BlockCopy(HeaderDevice, 0, CmdSendPLC, 9 + TempleteWritePath3.Length, 3);
+            Buffer.BlockCopy(Device, 0, CmdSendPLC, 12 + TempleteWritePath3.Length, 1);
+            Buffer.BlockCopy(NumberofDevice, 0, CmdSendPLC, 13 + TempleteWritePath3.Length, 2);
+            Buffer.BlockCopy(datawritetoplc, 0, CmdSendPLC, 15 + TempleteWritePath3.Length, datawritetoplc.Length);
+            CancellationTokenSource CancellationToken = new CancellationTokenSource();
+            Task writeTask = stream.WriteAsync(CmdSendPLC, 0, CmdSendPLC.Length, CancellationToken.Token);
+            if (await Task.WhenAny(writeTask, Task.Delay(TimeOut, CancellationToken.Token)) != writeTask)
+            {
+                CancellationToken.Cancel();
+                throw new TimeoutException($"{Devicestr}{HeaderDeviceint} Error Trigger Exist Send timed out.");
+            }
+            await writeTask;
+            Task<int> readTask = stream.ReadAsync(DataReciveFromPLC, 0, DataReciveFromPLC.Length, CancellationToken.Token);
+            if (await Task.WhenAny(readTask, Task.Delay(TimeOut, CancellationToken.Token)) != readTask)
+            {
+                CancellationToken.Cancel();
+                throw new TimeoutException($"{Devicestr}{HeaderDeviceint} Error Trigger Exist Send timed out.");
+            }
+            await readTask;
+        }
+        public async Task WriteFloat(NetworkStream stream, int TimeOut, string Devicestr, int HeaderDeviceint, int datawrite)
+        {
+            byte[] DataReciveFromPLC = new byte[100];
+            byte[] HeaderDevice = BitConverter.GetBytes(HeaderDeviceint);
+            byte[] Device = Converttextdevicetohexdevice(Devicestr);
+            byte[] NumberofDevice = BitConverter.GetBytes(2);
+            byte[] datawritetoplc;
+            datawritetoplc = BitConverter.GetBytes(datawrite);
+            byte[] path2 = BitConverter.GetBytes(TempleteWritePath3.Length + 6 + datawritetoplc.Length);
+            byte[] CmdSendPLC = new byte[21 + datawritetoplc.Length];
+            Buffer.BlockCopy(TempleteWritePath1, 0, CmdSendPLC, 0, TempleteWritePath1.Length);
+            Buffer.BlockCopy(path2, 0, CmdSendPLC, 7, 2);
+            Buffer.BlockCopy(TempleteWritePath3, 0, CmdSendPLC, 9, TempleteWritePath3.Length);
+            Buffer.BlockCopy(HeaderDevice, 0, CmdSendPLC, 9 + TempleteWritePath3.Length, 3);
+            Buffer.BlockCopy(Device, 0, CmdSendPLC, 12 + TempleteWritePath3.Length, 1);
+            Buffer.BlockCopy(NumberofDevice, 0, CmdSendPLC, 13 + TempleteWritePath3.Length, 2);
+            Buffer.BlockCopy(datawritetoplc, 0, CmdSendPLC, 15 + TempleteWritePath3.Length, datawritetoplc.Length);
+            CancellationTokenSource CancellationToken = new CancellationTokenSource();
+            Task writeTask = stream.WriteAsync(CmdSendPLC, 0, CmdSendPLC.Length, CancellationToken.Token);
+            if (await Task.WhenAny(writeTask, Task.Delay(TimeOut, CancellationToken.Token)) != writeTask)
+            {
+                CancellationToken.Cancel();
+                throw new TimeoutException($"{Devicestr}{HeaderDeviceint} Error Trigger Exist Send timed out.");
+            }
+            await writeTask;
+            Task<int> readTask = stream.ReadAsync(DataReciveFromPLC, 0, DataReciveFromPLC.Length, CancellationToken.Token);
+            if (await Task.WhenAny(readTask, Task.Delay(TimeOut, CancellationToken.Token)) != readTask)
+            {
+                CancellationToken.Cancel();
+                throw new TimeoutException($"{Devicestr}{HeaderDeviceint} Error Trigger Exist Send timed out.");
+            }
+            await readTask;
         }
         public static byte[] Converttextdevicetohexdevice(string namedevice)
         {
@@ -191,7 +303,7 @@ namespace TALibrary
     public class Db_connect
     {
         public static string connection_string = "";
-        public static DataTable StoreFillDS(string query_object, CommandType type, params object[] obj)
+        public static DataTable Exc_GetTable(string query_object, CommandType type, params object[] obj)
         {
             using (SqlConnection conn = new SqlConnection(connection_string))
             {
@@ -210,7 +322,7 @@ namespace TALibrary
                 return ds.Tables[0];
             }
         }
-        public static object getscalra(string query_object, CommandType type, params object[] obj)
+        public static object Exc_GetScalra(string query_object, CommandType type, params object[] obj)
         {
             using (SqlConnection conn = new SqlConnection(connection_string))
             {
@@ -228,7 +340,7 @@ namespace TALibrary
                 return data;
             }
         }
-        public static int exnonquery(string query_object, CommandType type, params object[] obj)
+        public static int Exc_NonQuery(string query_object, CommandType type, params object[] obj)
         {
             using (SqlConnection conn = new SqlConnection(connection_string))
             {
@@ -246,6 +358,21 @@ namespace TALibrary
                 return data;
             }
         }
+        public static void Exc_BulkCoppy(string NameTableDatabase,DataTable datatable)
+        {
+            using (SqlConnection connection = new SqlConnection(connection_string))
+            {
+                connection.Open();
+                using (SqlBulkCopy bulkCopy = new SqlBulkCopy(connection))
+                {
+                    bulkCopy.DestinationTableName = NameTableDatabase;
+                    bulkCopy.WriteToServer(datatable);
+                }
+                connection.Close();
+            }
+        }
+
     }
+   
 
 }
